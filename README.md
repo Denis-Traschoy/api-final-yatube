@@ -379,7 +379,7 @@ Content-Type: application/json
     ]
 }
 ```
-## Автор
+## API для проекта написал 
 
 Трещёв Денис
 
