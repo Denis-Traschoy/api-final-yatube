@@ -1,9 +1,8 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, permissions, status, viewsets
+from rest_framework import filters, permissions, viewsets, generics
 from rest_framework.pagination import LimitOffsetPagination
-from rest_framework.response import Response
 
-from posts.models import Follow, Group, Post
+from posts.models import Group, Post
 from .permissions import IsAuthorOrReadOnly
 from .serializers import (CommentSerializer, FollowSerializer, GroupSerializer,
                           PostSerializer)
@@ -47,28 +46,15 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.save(author=self.request.user, post=post)
 
 
-class FollowViewSet(viewsets.ModelViewSet):
+class FollowListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FollowSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['following__username']
-    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    pagination_class = LimitOffsetPagination
 
     def get_queryset(self):
-        return Follow.objects.filter(user=self.request.user)
-
-    def get_object(self):
-        following_id = self.kwargs.get('pk')
-        return get_object_or_404(
-            Follow,
-            user=self.request.user,
-            following_id=following_id
-        )
+        return self.request.user.follower_set.all()
 
     def perform_create(self, serializer):
-        serializer.save()
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer.save(user=self.request.user)

@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from rest_framework import serializers
 from rest_framework.relations import SlugRelatedField
+from rest_framework.validators import UniqueTogetherValidator
 
 from posts.models import Comment, Follow, Group, Post
 
@@ -55,10 +56,10 @@ class CommentSerializer(serializers.ModelSerializer):
 
 
 class FollowSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        slug_field='username',
-        read_only=True
-    )
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    # Через скрытое поле чтобы оно всё ещё было не изменяемым, но рид онли
+    # выдаёт в UniqueTogether вместо юзера None, сохранение юзера прямо в вьюсе
+    # тоже не помогло.
     following = serializers.SlugRelatedField(
         slug_field='username',
         queryset=User.objects.all()
@@ -67,20 +68,27 @@ class FollowSerializer(serializers.ModelSerializer):
     class Meta:
         model = Follow
         fields = ('id', 'user', 'following')
-        read_only_fields = ('id', 'user')
+        read_only_fields = ('id',)
+        validators = [
+            UniqueTogetherValidator(
+                queryset=Follow.objects.all(),
+                fields=['user', 'following'],
+                message='Вы уже подписаны на этого пользователя'
+            )
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['user'] = instance.user.username
+        return data
 
     def validate_following(self, value):
         user = self.context['request'].user
         if user == value:
             raise serializers.ValidationError(
-                'Нельзя подписаться на самого себя')
-        if Follow.objects.filter(user=user, following=value).exists():
-            raise serializers.ValidationError(
-                'Вы уже подписаны на этого пользователя')
+                'Нельзя подписаться на самого себя'
+            )
         return value
 
     def create(self, validated_data):
-        return Follow.objects.create(
-            user=self.context['request'].user,
-            **validated_data
-        )
+        return Follow.objects.create(**validated_data)
