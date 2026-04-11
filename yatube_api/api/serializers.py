@@ -57,9 +57,6 @@ class CommentSerializer(serializers.ModelSerializer):
 
 class FollowSerializer(serializers.ModelSerializer):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    # Через скрытое поле чтобы оно всё ещё было не изменяемым, но рид онли
-    # выдаёт в UniqueTogether вместо юзера None, сохранение юзера прямо в вьюсе
-    # тоже не помогло.
     following = serializers.SlugRelatedField(
         slug_field='username',
         queryset=User.objects.all()
@@ -89,6 +86,3 @@ class FollowSerializer(serializers.ModelSerializer):
                 'Нельзя подписаться на самого себя'
             )
         return value
-
-    def create(self, validated_data):
-        return Follow.objects.create(**validated_data)
